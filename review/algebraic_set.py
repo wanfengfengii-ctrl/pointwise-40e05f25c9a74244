@@ -52,7 +52,9 @@ def _join(left, right):
         return left
     if right.lower is not None:
         contact = compare_exact(left.upper, right.lower)
-        if contact < 0 or (contact == 0 and not (left.upper_closed or right.lower_closed)):
+        if contact < 0 or (
+            contact == 0 and not (left.upper_closed and right.lower_closed)
+        ):
             return None
     if right.upper is None:
         return ExactInterval(left.lower, None, left.lower_closed)

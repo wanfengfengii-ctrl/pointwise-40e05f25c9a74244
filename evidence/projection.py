@@ -16,15 +16,25 @@ def project_joint_domain(fitted, wiring):
     )
     slack = fitted.budget.slack
     zero = Fraction(0)
-    variances = [zero] * len(center)
-    if slack:
-        for index, row in enumerate(coefficients):
-            dual = solve_linear_system(least_squares.gram, row)
-            variances[index] = slack * sum(
-                (coefficient * value for coefficient, value in zip(row, dual, strict=True)), zero
-            )
+    size = len(center)
+    # The joint feasible domain is the closed ellipsoid (w-mu)^T C^{-1} (w-mu) <= slack,
+    # whose full shape matrix C = slack * A * gram^{-1} * A^T carries the cross-channel
+    # covariances.  Dropping the off-diagonal entries disconnects channels that share a
+    # private drive and corrupts every outlet/inlet ratio below.
+    dual_rows = tuple(
+        solve_linear_system(least_squares.gram, row) if slack else tuple(zero for _ in row)
+        for row in coefficients
+    )
+
+    def _entry(index, column):
+        if not slack:
+            return zero
+        return slack * sum(
+            (coefficient * value for coefficient, value in zip(coefficients[index], dual_rows[column], strict=True)),
+            zero,
+        )
+
     shape = tuple(
-        tuple(variance if index == column else zero for column in range(len(center)))
-        for index, variance in enumerate(variances)
+        tuple(_entry(index, column) for column in range(size)) for index in range(size)
     )
     return PublicReadings(catalog, center, shape)
